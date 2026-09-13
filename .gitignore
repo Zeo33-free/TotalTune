@@ -1,0 +1,21 @@
+# Build output
+build/
+*/build/
+# 多版本 JUCE 并存：build9 用 JUCE 9、build 用 JUCE 8
+build*/
+*/build*/
+*_artefacts/
+
+# IDE / OS
+.vs/
+.vscode/
+.idea/
+*.user
+*.suo
+.DS_Store
+Thumbs.db
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake

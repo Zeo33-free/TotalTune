@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="zh-cn">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TotalTune — 高限纯律 MPE MIDI 编辑器</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ============ 顶栏 ============ -->
+<header id="topbar">
+  <button id="btn-play" class="circle-btn primary" title="播放 (空格)">
+    <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+  </button>
+  <button id="btn-stop" class="circle-btn" title="停止 (空格)">
+    <svg viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
+  </button>
+  <button id="btn-follow" class="btn active" title="播放随光标滚动（开/关）">随光标</button>
+  <button id="btn-undo" class="btn" title="撤销 (Ctrl+Z)">撤销</button>
+  <button id="btn-redo" class="btn" title="重做 (Ctrl+Y)">重做</button>
+
+  <div class="tb-group">
+    <span class="tb-label">BPM</span>
+    <input id="bpm-input" class="tb-input" type="number" min="20" max="300" step="1" value="120" readonly title="BPM 跟随宿主，此处只读">
+  </div>
+
+  <div class="tb-group">
+    <label class="tb-check"><input id="snap-enabled" type="checkbox" tabindex="-1"> 量化时值</label>
+    <select id="snap-denom" class="tb-input" title="量化网格">
+      <option value="1">1/1</option>
+      <option value="2">1/2</option>
+      <option value="4" selected>1/4</option>
+      <option value="8">1/8</option>
+      <option value="16">1/16</option>
+      <option value="32">1/32</option>
+      <option value="64">1/64</option>
+      <option value="128">1/128</option>
+    </select>
+    <label class="tb-check"><input id="snap-triplet" type="checkbox" tabindex="-1"> Triplet</label>
+    <label class="tb-check" title="拖动音符时音高始终吸附到当前律制音级（不锁时间，与 Alt 无关）"><input id="snap-tuning" type="checkbox" tabindex="-1"> 吸附律制</label>
+  </div>
+
+  <div class="tb-group">
+    <span class="tb-label">律制</span>
+    <select id="tuning-select" class="tb-input">
+      <option value="12tet">12-TET</option>
+      <option value="ji">JI</option>
+      <option value="custom">自定义…</option>
+    </select>
+    <span class="tb-label">A4</span>
+    <input id="a4-input" class="tb-input" type="number" min="380" max="500" step="0.1" value="440">
+  </div>
+
+  <div class="spacer"></div>
+
+  <button id="btn-synth" class="icon-btn synth-btn" title="小合成器（音量/波形）">
+    <svg viewBox="0 0 24 24"><path d="M7 14a2 2 0 0 1-2-2V7a2 2 0 1 1 4 0v5a2 2 0 0 1-2 2zm5-2a2 2 0 0 1-2-2V4a2 2 0 1 1 4 0v6a2 2 0 0 1-2 2zm5 2a2 2 0 0 1-2-2V7a2 2 0 1 1 4 0v5a2 2 0 0 1-2 2zM4 17h16v2H4z"/></svg>
+  </button>
+  <button id="btn-save" class="btn primary" title="保存工程到指定位置">保存</button>
+  <button id="btn-load" class="btn" title="加载 .gjs">加载</button>
+  <button id="btn-about" class="btn" title="关于 TotalTune">关于</button>
+  <input id="file-input" type="file" accept=".gjs,application/json" style="display:none">
+  <a id="dl-anchor" style="display:none"></a>
+</header>
+
+<!-- ============ 主区 ============ -->
+<div id="main">
+
+  <!-- 左栏：Scene 管理器 -->
+  <aside id="sidebar">
+    <div class="side-head">
+      <span>Scene</span>
+      <button id="btn-add-scene" class="icon-btn" title="新建 Scene（需编辑和声）">
+        <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/></svg>
+      </button>
+    </div>
+    <div id="scene-list"></div>
+    <div class="side-head" style="border-top:1px solid var(--color-divider)">
+      <span>文件</span>
+      <button id="btn-add-melody" class="icon-btn" title="添加旋律文件">
+        <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6z"/></svg>
+      </button>
+    </div>
+    <div id="file-list"></div>
+  </aside>
+
+  <!-- 编辑器 -->
+  <div id="editor-wrap">
+    <div id="ruler-row">
+      <div id="ruler-gutter"></div>
+      <canvas id="ruler"></canvas>
+      <button id="btn-anchor-lock" class="icon-btn" title="锁定 1/1 锚点：开启后选中音符不再改变律制窗中心">🔒</button>
+    </div>
+    <div id="editor-row">
+      <canvas id="keycolumn"></canvas>
+      <canvas id="editor-canvas"></canvas>
+      <canvas id="tuningcolumn"></canvas>
+    </div>
+    <canvas id="hscroll"></canvas>
+  </div>
+</div>
+
+<!-- ============ 底部 ============ -->
+<footer id="bottombar">
+  <div id="inspector">
+    <div class="insp-title">检查器</div>
+    <div id="inspector-body"><div class="insp-hint">未选中音符。双击编辑器新建音符。</div></div>
+  </div>
+  <div id="tuning-panel">
+    <div id="interval-box" style="display:none">
+      <div class="interval-rows">
+        <div class="interval-row" id="interval-row-up"></div>
+        <div class="interval-row" id="interval-row-down"></div>
+      </div>
+      <button id="btn-edit-intervals" class="icon-btn" title="编辑音程集" style="align-self:flex-end">
+        <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+      </button>
+    </div>
+  </div>
+</footer>
+
+<div id="toast"></div>
+
+<!-- ============ 复音超限警告条 ============ -->
+<div id="poly-warn" class="poly-warn" style="display:none">
+  ⚠ MPE 复音超过 15 —— 已自动替换最早结束的音符
+</div>
+
+<!-- ============ 小合成器面板 ============ -->
+<div id="synth-panel" class="synth-panel" style="display:none">
+  <div class="synth-head">
+    <span>小合成器</span>
+    <button id="synth-close" class="icon-btn" title="关闭">
+      <svg viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+    </button>
+  </div>
+  <div class="synth-body">
+    <div class="synth-row">
+      <label>音量</label>
+      <input id="synth-vol" type="range" min="0" max="100" value="80">
+      <span id="synth-vol-val">80</span>
+    </div>
+    <div class="synth-row">
+      <label>波形</label>
+      <div class="synth-waves" id="synth-waves">
+        <button data-wave="0" class="on" title="正弦波">∿</button>
+        <button data-wave="1" title="三角波">△</button>
+        <button data-wave="2" title="锯齿波">⩘</button>
+        <button data-wave="3" title="方波">⊓</button>
+      </div>
+    </div>
+    <div class="synth-hint">宝宝\(￣︶￣*\))</div>
+  </div>
+</div>
+
+<!-- ============ 和声编辑弹窗 ============ -->
+<div id="harmony-modal" class="modal-mask" style="display:none">
+  <div class="modal">
+    <h3>编辑和声 — <span id="hm-scene-name"></span></h3>
+    <div class="modal-body">
+      <div class="insp-hint" style="margin-bottom:0.5rem">
+        每行一个和弦，格式：<b>根音:音程,音程,...</b>（音程为半音数，支持小数=纯律音分）。
+        例：<code>0:0,4,7,11</code>（大七和弦）&nbsp; <code>4:0,3,7</code>（小三和弦）
+      </div>
+      <textarea id="harmony-text" spellcheck="false"></textarea>
+      <div class="insp-hint" style="margin-top:0.5rem">
+        保存后可在编辑器中直接编辑和声文件。
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button id="hm-cancel" class="btn">取消</button>
+      <button id="hm-ok" class="btn primary">生成和声</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 旋律编辑弹窗 ============ -->
+<div id="melody-modal" class="modal-mask" style="display:none">
+  <div class="modal">
+    <h3>编辑旋律 — <span id="mm-file-name"></span></h3>
+    <div class="modal-body">
+      <div class="insp-hint" style="margin-bottom:0.5rem">
+        每行一个音符：<b>开始:时值:音高[:力度]</b>（时值省略=1 拍，力度省略=100）。
+        音高用 MIDI 号（60=C4，可小数=微音）或音名（C4、D#3、Eb4，可带音分如 C4+35）。
+        例：<code>0:1:60</code> &nbsp; <code>1:0.5:D#4</code> &nbsp; <code>2:2:C4+35</code>
+      </div>
+      <textarea id="melody-text" spellcheck="false"></textarea>
+      <div class="insp-hint" style="margin-top:0.5rem">
+        保存后可在编辑器中直接编辑旋律文件。
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button id="mm-cancel" class="btn">取消</button>
+      <button id="mm-ok" class="btn primary">应用</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 自定义律制弹窗 ============ -->
+<div id="custom-tuning-modal" class="modal-mask" style="display:none">
+  <div class="modal">
+    <h3>自定义律制</h3>
+    <div class="modal-body">
+      <div class="insp-hint" style="margin-bottom:0.5rem">
+        每行一个音级，格式：<b>比率 或 分子/分母</b>（相对 1/1，可省略 1/1 行）。
+        例：<code>1</code>、<code>9/8</code>、<code>1.25</code>、<code>7/4</code>
+      </div>
+      <textarea id="custom-tuning-text" spellcheck="false"></textarea>
+    </div>
+    <div class="modal-foot">
+      <button id="ct-cancel" class="btn">取消</button>
+      <button id="ct-ok" class="btn primary">应用</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 任意比音程弹窗 ============ -->
+<div id="ratio-modal" class="modal-mask" style="display:none">
+  <div class="modal" style="width:18rem">
+    <h3>任意比音程</h3>
+    <div class="modal-body">
+      <input id="ratio-input" class="tb-input" style="width:100%;height:2rem;font-size:0.85rem"
+             placeholder="分子/分母，如 3/2" spellcheck="false">
+    </div>
+    <div class="modal-foot">
+      <button id="rt-cancel" class="btn">取消</button>
+      <button id="rt-ok" class="btn primary">构建</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 音程集编辑弹窗 ============ -->
+<div id="intervals-modal" class="modal-mask" style="display:none">
+  <div class="modal">
+    <h3>编辑可用音程</h3>
+    <div class="modal-body">
+      <div class="insp-hint" style="margin-bottom:0.5rem">
+        每行一个音程：<b>标签:分子/分母</b>。上行与下行自动成对生成。
+        例：<code>3:3/2</code>（↑3 = 纯五度 3/2）
+      </div>
+      <textarea id="intervals-text" spellcheck="false"></textarea>
+    </div>
+    <div class="modal-foot">
+      <button id="iv-cancel" class="btn">取消</button>
+      <button id="iv-ok" class="btn primary">应用</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 关于弹窗 ============ -->
+<div id="about-modal" class="modal-mask" style="display:none">
+  <div class="modal" style="width:20rem">
+    <h3>关于 TotalTune</h3>
+    <div class="modal-body about-body">
+      <div class="about-logo">TotalTune</div>
+      <div class="about-version">v1.0.0 Windows x64</div>
+      <div class="about-line">高限纯律 MPE MIDI 编辑器</div>
+      <div class="about-line">这啥啊这</div>
+      <div class="about-sep"></div>
+      <div class="about-line">Made by <b>R1C1N</b></div>
+      <div class="about-line about-dim">Copyright (c) 2026 R1C1N. All rights reserved.</div>
+    </div>
+    <div class="modal-foot">
+      <button id="ab-ok" class="btn primary">关闭</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/tuning.js"></script>
+<script src="js/model.js"></script>
+<script src="js/serialize.js"></script>
+<script src="js/mpe_export.js"></script>
+<script src="js/live_export.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/keycolumn.js"></script>
+<script src="js/tuningcolumn.js"></script>
+<script src="js/editor.js"></script>
+<script src="js/manager.js"></script>
+<script src="js/app.js"></script>
+<script src="js/bridge.js"></script>
+</body>
+</html>
