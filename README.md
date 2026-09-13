@@ -4,7 +4,7 @@ A just-intonation MPE MIDI editor — JUCE + WebView plugin.
 
 Harmony × Melody · Any tuning system · Real-time MPE output.
 
-![TotalTune](docs/screenshot.png)
+![TotalTune](screenshot.png)
 
 ## What is it
 
