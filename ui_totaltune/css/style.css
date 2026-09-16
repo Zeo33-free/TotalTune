@@ -515,6 +515,36 @@ select.tb-input { width: auto; padding-right: 1.2rem; }
 }
 .file-mute.on { background: var(--color-warn, #c0392b); color: #fff; }
 
+/* ---------- 文件混音旋钮 ---------- */
+.file-knob {
+  --kv: 0.8;
+  width: 0.95rem; height: 0.95rem;
+  border-radius: 100%;
+  flex: none;
+  background:
+    conic-gradient(from 220deg,
+      var(--color-theme) 0deg,
+      var(--color-theme) calc(var(--kv) * 280deg),
+      var(--color-divider) calc(var(--kv) * 280deg),
+      var(--color-divider) 280deg,
+      transparent 280deg),
+    var(--color-background-dark);
+  border: 1px solid var(--color-divider);
+  cursor: ns-resize;
+  position: relative;
+}
+.file-knob:hover { border-color: var(--color-theme); }
+.file-knob-ind {
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 2px; height: 38%;
+  background: var(--color-text);
+  border-radius: 1px;
+  transform: translate(-50%, -100%) rotate(calc(var(--kv) * 280deg - 140deg));
+  transform-origin: 50% 100%;
+  pointer-events: none;
+}
+
 /* ---------- toast ---------- */
 #toast {
   position: fixed;

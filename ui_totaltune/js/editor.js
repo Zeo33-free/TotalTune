@@ -771,6 +771,49 @@ const Editor = (() => {
     n.cents = Math.max(min, Math.min(max, n.cents));
   }
 
+  /* ---------- E：补全音程基频 ----------
+   * 选中两个音符 → 音程拟合为 m/k（分子分母 <16、互质）→ 两音视为同一
+   * 基频 f 的第 k/m 次泛音（f = 低音 − 1200·log2(k)）→ 向下补全泛音列上
+   * 第 8、4、1 音（仅补 < k 的；同位已有音符则跳过，防重复按 E 叠加）。 */
+  function completeHarmonics() {
+    if (!activeFile) return;
+    const sel = getSelected();
+    // ★ 框选常会带进第 3 个音符（或跨文件时只选中 1 个）：取最低+最高两个拟合，
+    //   中间音符忽略；不足 2 个时提示实际数量，方便排查。
+    if (sel.length < 2) {
+      App.toast(sel.length === 0
+        ? "补全音程：请先选中两个音符（框选/点选，仅当前文件）"
+        : `补全音程：只选中了 1 个音符（跨文件的框选不算，需同文件内 2 个）`);
+      return;
+    }
+    let lo = 0, hi = 0;
+    for (let i = 1; i < sel.length; i++) {
+      if (sel[i].cents < sel[lo].cents) lo = i;
+      if (sel[i].cents > sel[hi].cents) hi = i;
+    }
+    const low = sel[lo], high = sel[hi];
+    const fit = Tuning.fitIntervalRatio(high.cents - low.cents, 15);
+    if (!fit) return;
+    const { m, k } = fit;
+    if (Math.abs(fit.error) > 25) {
+      App.toast(`音程拟合偏差过大（最近 ${m}/${k}，${Math.abs(fit.error).toFixed(1)}¢）`);
+      return;
+    }
+    const fund = low.cents - 1200 * Math.log2(k);   // 基频位置（cents）
+    const min = Tuning.midiToCents(0), max = Tuning.midiToCents(127);
+    const added = [];
+    for (const h of [8, 4, 1]) {
+      if (h >= k) continue;                          // 只补低于低音泛音次的
+      const cents = Math.max(min, Math.min(max, fund + 1200 * Math.log2(h)));
+      if (activeFile.notes.some(n => n.start === low.start && Math.abs(n.cents - cents) < 0.5)) continue;
+      added.push({ h, note: Model.makeNote(low.start, low.dur, cents, low.vel) });
+    }
+    if (!added.length) { App.toast(`${m}/${k}：低音已接近基音，无可补泛音`); return; }
+    for (const a of added) activeFile.notes.push(a.note);
+    afterEdit();
+    App.toast(`${m}/${k}：已补全第 ${added.map(x => x.h).join("、")} 泛音（+${added.length} 音）`);
+  }
+
   /* ---------- 键盘 ---------- */
   // ★ 劫持浏览器快捷键（插件环境不需要浏览器行为）：
   //   F5 刷新 / Ctrl+P 打印 / Ctrl+S 保存网页 / Ctrl+F 查找 / Ctrl+D 收藏
@@ -828,6 +871,12 @@ const Editor = (() => {
         const btn = document.getElementById("btn-anchor-lock");
         if (btn) btn.classList.toggle("on", anchorLocked);
         if (App && App.toast) App.toast(anchorLocked ? "律制窗锚点：已锁定" : "律制窗锚点：未锁定");
+        e.preventDefault();
+        return;
+      }
+      // ★ E = 补全音程基频：选中两音 → 拟合 m/k（<16）→ 向下补泛音 8/4/1
+      if (key === "e") {
+        completeHarmonics();
         e.preventDefault();
         return;
       }

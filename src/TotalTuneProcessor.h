@@ -189,6 +189,7 @@ struct TTNoteEvent
     double durBeat   = 1.0;   // 时值（拍）
     double cents     = 0.0;   // 音高（相对 A4 的 cents）
     int    vel       = 100;
+    float  synthVol  = 0.8f;  // 文件混音音量（0-1）：只缩放内置合成器，不影响 MIDI 力度
 };
 
 // =============================================================================

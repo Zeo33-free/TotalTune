@@ -104,10 +104,14 @@ const Manager = (() => {
       const soloed = !!state.solo[file.id];
       const muted = !!state.mute[file.id];
       const color = fileColor(file);
+      const knobVal = Math.round(Math.max(0, Math.min(1, typeof file.synthVol === "number" ? file.synthVol : 0.8)) * 100);
       div.innerHTML = `
         <span class="file-dot" style="background:${color}"></span>
         <span class="file-name">${escapeHtml(file.name)}</span>
         <span class="file-tag">${tag}</span>
+        <div class="file-knob" title="混音音量（拖动调节，双击复位）" data-val="${knobVal}">
+          <div class="file-knob-ind"></div>
+        </div>
         <button class="icon-btn file-solo${soloed ? " on" : ""}" title="Solo 单独播放此文件">S</button>
         <button class="icon-btn file-mute${muted ? " on" : ""}" title="Mute 静音此文件">M</button>
         ${onCopy ? `<button class="icon-btn file-copy" title="复制文件">
@@ -124,6 +128,8 @@ const Manager = (() => {
         e.stopPropagation();
         App.handleMute(file);
       });
+      // 混音旋钮：上下拖动调节（只影响小合成器试听音量，不影响 MIDI 力度）
+      attachKnobDrag(div.querySelector(".file-knob"), file);
       if (!readonly) {
         div.querySelector(".file-name").title = "双击重命名";
       }
@@ -160,7 +166,13 @@ const Manager = (() => {
       mk(m, "旋律", false,
         () => {
           Model.removeMelody(s, m.id);
-          if (state.fileId === m.id) state.fileId = s.harmony.id;
+          if (state.fileId === m.id) {
+            // ★ 同步 Editor 的 activeFile：只改 state.fileId 不调
+            //   setActiveFile 的话，Editor 内部还指着已删除的旋律对象，
+            //   画布上所有文件都变灰（activeFile === m 永不匹配）且无法编辑
+            state.fileId = s.harmony.id;
+            Editor.setActiveFile(s.harmony);
+          }
           onChange();
           render();
         },
@@ -191,6 +203,42 @@ const Manager = (() => {
     onChange();
     render();
     App.toast(`已复制「${file.name}」`);
+  }
+
+  /* ---------- 混音旋钮 ----------
+   * 上下拖动调节（上增下减），双击复位 80%。只影响内置小合成器的
+   * 发声音量（本地试听/混音），不碰 MIDI 输出的力度。 */
+  function attachKnobDrag(knob, file) {
+    const setVal = (v) => {
+      v = Math.max(0, Math.min(1, v));
+      file.synthVol = v;
+      knob.dataset.val = String(Math.round(v * 100));
+      knob.style.setProperty("--kv", String(v));
+      onChange();
+    };
+    knob.style.setProperty("--kv", String(Math.max(0, Math.min(1, typeof file.synthVol === "number" ? file.synthVol : 0.8))));
+    knob.addEventListener("pointerdown", (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      const startY = e.clientY;
+      const startV = typeof file.synthVol === "number" ? file.synthVol : 0.8;
+      const move = (ev) => {
+        setVal(startV + (startY - ev.clientY) / 150);
+      };
+      const up = () => {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", up);
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+    });
+    knob.addEventListener("dblclick", (e) => {
+      e.stopPropagation();
+      setVal(0.8);
+    });
+    // ★ click 也拦住：双击重命名走 div 上的 click 计时检测，
+    //   旋钮的 click 冒泡上去会被误判成「双击文件项」弹出重命名
+    knob.addEventListener("click", (e) => e.stopPropagation());
   }
 
   /* ---------- 选择 ---------- */

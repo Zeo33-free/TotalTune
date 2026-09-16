@@ -141,6 +141,26 @@ const Tuning = (() => {
     return { cents: best.cents, midi: null, ratio: best.ratio, label: best.label, degree: best.degree, octave: best.octave };
   }
 
+  function gcd(a, b) { return b ? gcd(b, a % b) : a; }
+
+  /** 音程拟合：把 cents 差拟合成互质比率 m/k（1 ≤ k < m ≤ maxN）。
+   *  返回 { m, k, cents, error }，error = 拟合 cents − 实际 cents。
+   *  迭代序保证误差相同时取最小分子分母。 */
+  function fitIntervalRatio(deltaCents, maxN = 15) {
+    let best = null;
+    for (let m = 2; m <= maxN; m++) {
+      for (let k = 1; k < m; k++) {
+        if (gcd(m, k) !== 1) continue;
+        const c = 1200 * Math.log2(m / k);
+        const err = c - deltaCents;
+        if (!best || Math.abs(err) < Math.abs(best.error)) {
+          best = { m, k, cents: c, error: err };
+        }
+      }
+    }
+    return best;
+  }
+
   let current = TUNINGS["12tet"];
   let currentA4 = A4_DEFAULT;
   /** JI/自定义律制的 1/1 锚点（cents）。选中音符时 = 音符音高，否则 C4 */
@@ -159,6 +179,6 @@ const Tuning = (() => {
     centsToFreq, freqToCents, midiToCents, centsToMidiFloat,
     midiName, centsOffsetFromTET, fmtOffset,
     TUNINGS, setTuning, setA4, getTuning, getA4, snap, setCustomRatios,
-    setAnchor, getAnchor, ratioValue, ratioLabel,
+    setAnchor, getAnchor, ratioValue, ratioLabel, fitIntervalRatio,
   };
 })();

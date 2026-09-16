@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.22)
 
 project(TotalTune
-    VERSION 1.0.0
+    VERSION 1.1.0
     DESCRIPTION "R1C1N TotalTune — just-intonation MPE MIDI editor"
     LANGUAGES C CXX)
 
@@ -63,7 +63,7 @@ juce_add_plugin(TotalTune
     COMPANY_COPYRIGHT           "Copyright (c) 2026 R1C1N"
     BUNDLE_ID                   "com.r1c1n.TotalTune"
     PRODUCT_NAME                "TotalTune"
-    VERSION                     "1.0.0"
+    VERSION                     "1.1.0"
     DESCRIPTION                 "Just-intonation MPE MIDI editor / generator"
     PLUGIN_MANUFACTURER_CODE    GsSt
     PLUGIN_CODE                 TtUn
@@ -81,7 +81,7 @@ juce_add_plugin(TotalTuneInst
     COMPANY_COPYRIGHT           "Copyright (c) 2026 R1C1N"
     BUNDLE_ID                   "com.r1c1n.TotalTuneInst"
     PRODUCT_NAME                "TotalTuneInst"
-    VERSION                     "1.0.0"
+    VERSION                     "1.1.0"
     DESCRIPTION                 "Just-intonation MPE MIDI instrument"
     PLUGIN_MANUFACTURER_CODE    GsSt
     PLUGIN_CODE                 TtIn

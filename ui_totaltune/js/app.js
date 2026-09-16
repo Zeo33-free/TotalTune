@@ -95,8 +95,9 @@ const App = (() => {
     const evs = [];
     const push = (file, kind) => {
       if (!fileAudible(file)) return;
+      const fv = Math.max(0, Math.min(1, typeof file.synthVol === "number" ? file.synthVol : 0.8));
       for (const n of file.notes) {
-        evs.push({ timeBeat: n.start, durBeat: n.dur, cents: n.cents, vel: n.vel, kind, _scheduled: false });
+        evs.push({ timeBeat: n.start, durBeat: n.dur, cents: n.cents, vel: n.vel, kind, fileVol: fv, _scheduled: false });
       }
     };
     push(s.harmony, "harmony");
@@ -527,8 +528,8 @@ const App = (() => {
     try {
       if (window.showSaveFilePicker) {
         const handle = await window.showSaveFilePicker({
-          suggestedName: "totaltune.ttp",
-          types: [{ description: "TotalTune 工程", accept: { "application/json": [".ttp"] } }],
+          suggestedName: "totaltune.ttk",
+          types: [{ description: "TotalTune 工程", accept: { "application/json": [".ttk"] } }],
         });
         const w = await handle.createWritable();
         await w.write(new Blob([json], { type: "application/json" }));
@@ -544,10 +545,10 @@ const App = (() => {
     const url = URL.createObjectURL(blob);
     const a = document.getElementById("dl-anchor");
     a.href = url;
-    a.download = "totaltune.ttp";
+    a.download = "totaltune.ttk";
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    toast("已保存 totaltune.ttp");
+    toast("已保存 totaltune.ttk");
   }
   function loadProject(file) {
     const reader = new FileReader();
@@ -608,6 +609,7 @@ const App = (() => {
           name: f.name,
           type: f.type,
           audible: fileAudible(f),
+          synthVol: Math.max(0, Math.min(1, typeof f.synthVol === "number" ? f.synthVol : 0.8)),
           notes: f.notes.map(n => ({ start: n.start, dur: n.dur, cents: n.cents, vel: n.vel })),
         })),
       })),

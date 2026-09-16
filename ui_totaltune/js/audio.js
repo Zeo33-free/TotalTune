@@ -38,11 +38,12 @@ const AudioEngine = (() => {
 
   function beatToSec(beat, bpm) { return beat * 60 / bpm; }
 
-  /** 简单合成器：三角波 + 衰减包络；和声用三角，旋律用锯齿+低通 */
-  function playNote(when, durSec, freq, vel, kind) {
+  /** 简单合成器：三角波 + 衰减包络；和声用三角，旋律用锯齿+低通。
+   *  fileVol：文件混音音量（0-1），只影响本地试听，不影响 MIDI 力度 */
+  function playNote(when, durSec, freq, vel, kind, fileVol = 1) {
     const osc = ctx.createOscillator();
     const g = ctx.createGain();
-    let amp = (vel / 127) * 0.22;
+    let amp = (vel / 127) * 0.22 * fileVol;
     let head = osc; // 信号链头
 
     if (kind === "bass") {
@@ -104,7 +105,7 @@ const AudioEngine = (() => {
       if (tBeat >= curBeat && tBeat < horizonBeat) {
         const when = startCtxTime + beatToSec(tBeat - startBeat, bpm);
         const durSec = Math.max(0.05, beatToSec(e.durBeat, bpm) * 0.95);
-        playNote(when, durSec, Tuning.centsToFreq(e.cents, Tuning.getA4()), e.vel, e.kind);
+        playNote(when, durSec, Tuning.centsToFreq(e.cents, Tuning.getA4()), e.vel, e.kind, e.fileVol ?? 1);
         scheduledKeys.add(k);
       }
     }

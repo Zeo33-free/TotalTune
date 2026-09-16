@@ -36,6 +36,7 @@ const Model = (() => {
       type,            // harmony | melody | bass
       name,
       notes: [],
+      synthVol: 0.8,   // 小合成器混音音量（0-1），不影响导出 MIDI 力度
       color: null,     // 由 UI 分配
     };
   }
@@ -193,6 +194,7 @@ const Model = (() => {
   function cloneFile(file, newName) {
     const f = makeFile(file.type, newName || file.name + " 副本");
     f.notes = file.notes.map(n => ({ ...n, id: nextId() }));
+    f.synthVol = typeof file.synthVol === "number" ? file.synthVol : 0.8;
     return f;
   }
 

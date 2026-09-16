@@ -139,6 +139,7 @@ void TotalTuneAudioProcessor::setProjectFromUiState (const juce::String& json)
                     continue;
 
                 const bool audible = (bool) (int) fileObj->getProperty ("audible");
+                const float fileSynthVol = (float) (double) fileObj->getProperty ("synthVol");
                 auto* notesArr = fileObj->getProperty ("notes").getArray();
                 if (notesArr == nullptr)
                     continue;
@@ -154,6 +155,7 @@ void TotalTuneAudioProcessor::setProjectFromUiState (const juce::String& json)
                     ev.durBeat   = juce::jmax (0.05, (double) n->getProperty ("dur"));
                     ev.cents     = (double) n->getProperty ("cents");
                     ev.vel       = (int) n->getProperty ("vel");
+                    ev.synthVol  = juce::jlimit (0.0f, 1.0f, fileSynthVol);
 
                     se.events.push_back (ev);
                     if (audible && se.sceneName == activeSceneName)
@@ -513,8 +515,9 @@ void TotalTuneAudioProcessor::fireNoteEvent (const TTNoteEvent& ev, juce::MidiBu
     midi.addEvent (juce::MidiMessage::noteOn (ch, note, (juce::uint8) juce::jlimit (1, 127, ev.vel)), samplePos);
 
     // 内置合成器同步发声（★ 传实际频率，JI 微音差也能正确发声，不能只给 12-TET 音号）
+    // ★ 文件混音音量只缩放合成器；MIDI 输出的 noteOn/pressure 仍用原始 vel
     const double freqHz = projectA4 * std::pow (2.0, ev.cents / 1200.0);
-    vs.synthVoice = synth.noteOn (note, ev.vel / 127.0f, freqHz);
+    vs.synthVoice = synth.noteOn (note, ev.vel / 127.0f * juce::jlimit (0.0f, 1.0f, ev.synthVol), freqHz);
 }
 
 // 播放头落在音符中间（起播/seek/loop 回绕）：立即触发仍在持续的音符。

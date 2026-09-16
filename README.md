@@ -89,6 +89,7 @@ TotalTune-Webui/
 │   ├── css/style.css
 │   └── js/                 # model / tuning / editor / manager / app /
 │                           # bridge / audio / mpe_export / live_export ...
+├── prototype/GoodJust/     # early pure-web prototype (opens in a browser)
 └── MANUAL.md
 ```
 

@@ -60,11 +60,13 @@ const MPEExport = (() => {
   }
 
   /**
-   * ★ 通道分配（与引擎 findFreeSlot/findSlotToSteal 同逻辑）：最低空闲优先。
-   *   按开始时间排序逐个分配：优先选「上一个音符已结束」的最低通道；
-   *   全占用时偷「结束最早」的通道。
-   *   旧版纯轮转 chIdx%15：相邻音符各占新通道，第 16 个音还会和第 1 个
-   *   （可能仍在响）撞同一通道 → pitchbend 互相覆盖、noteOff 误杀。
+   * ★ 通道分配：选「空闲最久」的通道（endOf 最小者，从未用过视为 -1）。
+   *   - 从未用过的通道最优先 → 音符自然轮铺 ch1-15，DAW 按通道分轨时
+   *     均匀分散，不挤前几轨；
+   *   - 都用过时选「上一个音符结束最早」的通道：它的 release 尾音衰减
+   *     时间最长，新音符的 pitchbend 不会改变还在释放中的前一个音
+   *     （note-off ≠ 声音停了，release 期间 pitchbend 仍生效）；
+   *   - 全占用时同样偷结束最早的（重叠不可避免，选衰减最久的）。
    *   返回 Map(note对象 → member ch)。
    */
   function assignChannels(notes, members) {
@@ -74,16 +76,13 @@ const MPEExport = (() => {
     for (const n of sorted) {
       const startTick = Math.round(n.start * PPQ);
       const endTick = Math.max(startTick + 1, Math.round((n.start + n.dur) * PPQ));
-      let ch = members.find(c => (endOf.get(c) ?? -1) <= startTick);
-      if (ch === undefined) {
-        // 全占用：偷结束最早的
-        let best = members[0], bestEnd = Infinity;
-        for (const c of members) {
-          const e = endOf.get(c) ?? -1;
-          if (e < bestEnd) { bestEnd = e; best = c; }
-        }
-        ch = best;
+      let ch = members[0], bestEnd = Infinity;
+      for (const c of members) {
+        const e = endOf.get(c) ?? -1;
+        if (e < bestEnd) { bestEnd = e; ch = c; }
       }
+      // bestEnd <= startTick：该通道已空闲且空闲最久（release 衰减最充分，安全复用）；
+      // bestEnd >  startTick：全占用，偷结束最早的。
       endOf.set(ch, endTick);
       result.set(n, ch);
     }
@@ -109,7 +108,7 @@ const MPEExport = (() => {
       t.add(0, [0xb0 | c, 38, 0]);
     }
 
-    // ★ 通道分配与引擎一致：最低空闲优先（旧版轮转 chIdx%15）
+    // ★ 通道分配：优先空闲最久的通道（轮铺 ch1-15 + 避开 release 尾音）
     const members = Array.from({ length: 15 }, (_, i) => 1 + i);
     const chOf = assignChannels(file.notes, members);
     const notes = file.notes.slice().sort((a, b) => a.start - b.start);
@@ -211,7 +210,7 @@ const MPEExport = (() => {
         tr.add(0, [0xb0 | c, 38, 0]);
       }
 
-      // ★ 通道分配与引擎一致：最低空闲优先（旧版轮转 chIdx%members.length）
+      // ★ 通道分配：优先空闲最久的通道（轮铺 ch1-15 + 避开 release 尾音）
       const chOf = assignChannels(file.notes, members);
       const notes = file.notes.slice().sort((a, b) => a.start - b.start);
       for (const n of notes) {
